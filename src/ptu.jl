@@ -21,7 +21,7 @@ end
 
 ## properties
 size(R::PTU) = (R.d, size(R.gauges, 2))
-eigvals(R::PTU) = R.λ
+eigvals(R::PTU) = R.model.λ
 neighbors(R::PTU) = R.k
 vertices(R::PTU) = R.component
 
