@@ -32,6 +32,35 @@ function summary(io::IO, R::PTU)
     print(io, "PTU{$(R.nearestneighbors)}(indim = $id, outdim = $od, neighbors = $(R.k))")
 end
 
+"""
+    get_connection(i::Int, j::Int, Θ::AbstractArray{T,3}) where T <: Real
+
+Get the connection from point `i` to point `j` associated with bases `Θ[:,:,i]` and
+Θ[:,:,j]
+"""
+function get_connection(i::Int, j::Int, Θ::AbstractArray{T,3}) where T <: Real
+    d,p,n = size(Θ)
+    R = zeros(T, p,p)
+    get_connection!(R, i,j,Θ)
+    R
+end
+
+function get_connection!(R::AbstractMatrix{T}, i::Int, j::Int, Θ::AbstractArray{T,3}) where T <: Real
+    d,p,n = size(Θ)
+    if i == j
+        return I(p)
+    end
+    θ0 = view(Θ,:,:,i)
+    Θ1 = view(Θ,:,:,j) 
+    get_connection!(R, θ0, θ1)
+end
+
+function get_connection!(R::AbstractMatrix{T}, θi::AbstractMatrix{T}, θj::AbstractMatrix{T}) where T <: Real
+    ss = svd(θi'*θj)
+    mul!(R, ss.U, ss.Vt)
+end
+
+
 ## interface functions
 """
     fit(PTU, data; k=12, maxoutdim=2, nntype=BruteForce)
@@ -57,7 +86,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     # Construct NN graph
     d, n = size(X)
     # construct orthognoal basis
-    Θ = zeros(T, d,maxoutdim,n)
+    B = zeros(T, d,maxoutdim,n)
 
     NN = fit(nntype, X)
     E, _ = adjacency_list(NN, X, K)
@@ -83,7 +112,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
         t0 = time()
         Up = standardize_basis(ss.U)
         ΔTsb += time() - t0
-        Θ[:,:,i] = Up[:,1:maxoutdim]
+        B[:,:,i] = Up[:,1:maxoutdim]
         next!(prog1)
     end
     n = length(C2)
@@ -92,7 +121,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     R = diagm(ones(T, maxoutdim))
     R2 = similar(R)
     R3 = similar(R)
-    θ = zeros(T, d,maxoutdim)
+    #θ = zeros(T, d,maxoutdim)
     if debug
         V = zeros(T, d)
     else
@@ -120,15 +149,14 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
         dj = dijkstra_shortest_paths(G,i,Ac2;trackvertices=true)
         ΔTdj += time() - t0
         # modified geodesic distance
-        # TODO: This is very convoluted (and probably not quite right yet. It would better to 
-        # modify the dijkstra algorithm directly)
+        # TODO: modify the dijkstra algorithm directly)
         for k in 2:n
             # get the path from i to closest_vertices[k]
             kn = dj.closest_vertices[k]
             fill!(V,zero(T))
             R .= I(maxoutdim)
             jp = i
-            θ0 = view(Θ,:,:,C2[jp])
+            θ0 = view(B,:,:,C2[jp])
             t0 = time()
             path = get_path(dj, kn)
             ΔTp += time() - t0
@@ -141,7 +169,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
                     V .+= X[:,C2[j2]]-X[:,C2[j1]]
                     DD[i,kn] += norm(X[:,C2[j2]]-X[:,C2[j1]])
                 else
-                    θ1 = view(Θ,:,:,C2[j1])
+                    θ1 = view(B,:,:,C2[j1])
                     if sum(θ1 .!= 0.0) == 0
                         @show i,l,j1,j2,kn
                         error("All zero gauge")
@@ -149,11 +177,12 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
                     # check if we have already computed this alignment
                     if qq[jp,j1] == false
                         t0 = time()
-                        ss = svd(θ0'*θ1)
-                        ΔT1 += time() - t0
+                        #ss = svd(θ0'*θ1)
                         #R .= R*(ss.V*ss.U')'
                         nt += 1
-                        Rq[:,:, jp,j1] = ss.U*ss.Vt
+                        #Rq[:,:, jp,j1] = ss.U*ss.Vt
+                        get_connection!(view(Rq, :,:,jp,j1), θ0,θ1)
+                        ΔT1 += time() - t0
                         qq[jp,j1] = true
                     end
                     t0 = time()
@@ -200,7 +229,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     else
         DD = (DD+DD')/2
         M = fit(MDS, DD, distances=true, maxoutdim=maxoutdim)
-        return PTU{nntype,T}(d, k,Θ, M, NN, C2)
+        return PTU{nntype,T}(d, k,B, M, NN, C2)
     end
 end
 
