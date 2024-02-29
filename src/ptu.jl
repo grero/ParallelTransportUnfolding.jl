@@ -92,7 +92,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
         δ_x = VX .- view(X, :, i:i) 
 
         # Compute orthogonal basis H of θ'
-        ss = svd(δ_x)
+        ss = svd(δ_x;full=true)
         t0 = time()
         Up = standardize_basis(ss.U)
         ΔTsb += time() - t0
