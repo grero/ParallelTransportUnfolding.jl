@@ -56,6 +56,9 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
              k::Real=12, K=k, maxoutdim::Int=2, nntype=BruteForce,debug=false) where {T<:Real}
     # Construct NN graph
     d, n = size(X)
+    # construct orthognoal basis
+    Θ = zeros(T, d,maxoutdim,n)
+
     NN = fit(nntype, X)
     E, _ = adjacency_list(NN, X, K)
     _, C = largest_component(SimpleGraph(n, E))
@@ -69,8 +72,6 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
         R = Dict(zip(C, collect(1:n)))
     end
 
-    # construct orthognoal basis
-    Θ = zeros(T, d,maxoutdim,n)
     #Θ = Vector{SMatrix{d,maxoutdim, Float64, d*maxoutdim}}(undef, n)
     ΔTsb = 0.0
     for (ii,i) in enumerate(C)
@@ -96,7 +97,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
         t0 = time()
         Up = standardize_basis(ss.U)
         ΔTsb += time() - t0
-        Θ[:,:,ii] = Up[:,1:maxoutdim]
+        Θ[:,:,i] = Up[:,1:maxoutdim]
     end
     n = length(C2)
     # compute shortest path for every point
@@ -139,7 +140,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
             fill!(V,zero(T))
             R .= I(maxoutdim)
             jp = i
-            θ0 = view(Θ,:,:,jp)
+            θ0 = view(Θ,:,:,C2[jp])
             t0 = time()
             path = get_path(dj, kn)
             ΔTp += time() - t0
@@ -152,7 +153,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
                     V .+= X[:,C2[j2]]-X[:,C2[j1]]
                     DD[i,kn] += norm(X[:,C2[j2]]-X[:,C2[j1]])
                 else
-                    θ1 = view(Θ,:,:,j1)
+                    θ1 = view(Θ,:,:,C2[j1])
                     # check if we have already computed this alignment
                     if qq[jp,j1] == false
                         t0 = time()
