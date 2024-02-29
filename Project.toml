@@ -1,7 +1,7 @@
 name = "ParallelTransportUnfolding"
 uuid = "268555e1-3ef2-4898-9b9d-141aa6e53af3"
 authors = ["roger <roger.herikstad@gmail.com>"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"

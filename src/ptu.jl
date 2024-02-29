@@ -98,6 +98,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
         ΔTsb += time() - t0
         Θ[:,:,ii] = Up[:,1:maxoutdim]
     end
+    n = length(C2)
     # compute shortest path for every point
     DD = zeros(T,n,n)
     R = diagm(ones(T, maxoutdim))
