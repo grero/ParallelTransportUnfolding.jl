@@ -61,35 +61,21 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
 
     NN = fit(nntype, X)
     E, _ = adjacency_list(NN, X, K)
-    _, C = largest_component(SimpleGraph(n, E))
+
     A = adjacency_matrix(NN, X, k)
     G, C2 = largest_component(SimpleGraph(A))
+    Ac2 = A[C2,C2] 
 
-    # Correct indexes of neighbors if more then one connected component
-    fixindex = length(C) < n
-    if fixindex
-        n = length(C)
-        R = Dict(zip(C, collect(1:n)))
-    end
-
-    #Θ = Vector{SMatrix{d,maxoutdim, Float64, d*maxoutdim}}(undef, n)
     ΔTsb = 0.0
-    for (ii,i) in enumerate(C)
+    prog1 = Progress(n, 1.0, "Constructiong bases...") 
+    for i in 1:n
         NI = E[i] # neighbor's indexes
 
-        # fix indexes for connected components
-        NIfix, NIcc = if fixindex # fix index
-            JJ = [i for i in NI if i ∈ C] # select points that are in CC
-            KK = [R[i] for i in JJ if haskey(R, i)] # convert NI to CC index
-            JJ, KK
-        else
-            NI, NI
-        end
-        l = length(NIfix)
+        l = length(NI)
         l == 0 && continue # skip
 
         # re-center points in neighborhood
-        VX = view(X, :, NIfix)
+        VX = view(X, :, NI)
         δ_x = VX .- view(X, :, i:i) 
 
         # Compute orthogonal basis H of θ'
@@ -98,6 +84,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
         Up = standardize_basis(ss.U)
         ΔTsb += time() - t0
         Θ[:,:,i] = Up[:,1:maxoutdim]
+        next!(prog1)
     end
     n = length(C2)
     # compute shortest path for every point
@@ -127,9 +114,10 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     ΔX = fill(0.0, d)
     v = fill(0.0, maxoutdim)
 
+    prog2 = Progress(n, 1.0, "Computing geodesics...")
     for i in 1:n 
         t0 = time()
-        dj = dijkstra_shortest_paths(G,i,A;trackvertices=true)
+        dj = dijkstra_shortest_paths(G,i,Ac2;trackvertices=true)
         ΔTdj += time() - t0
         # modified geodesic distance
         # TODO: This is very convoluted (and probably not quite right yet. It would better to 
@@ -154,6 +142,10 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
                     DD[i,kn] += norm(X[:,C2[j2]]-X[:,C2[j1]])
                 else
                     θ1 = view(Θ,:,:,C2[j1])
+                    if sum(θ1 .!= 0.0) == 0
+                        @show i,l,j1,j2,kn
+                        error("All zero gauge")
+                    end
                     # check if we have already computed this alignment
                     if qq[jp,j1] == false
                         t0 = time()
@@ -195,6 +187,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
                 #DD[i,kn] = sqrt(DD[i,kn])
             end
         end
+        next!(prog2)
     end
     # broadcast!(x->-x*x/2, DD, DD)
     #symmetrize!(DD) # error in MvStats
@@ -207,7 +200,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     else
         DD = (DD+DD')/2
         M = fit(MDS, DD, distances=true, maxoutdim=maxoutdim)
-        return PTU{nntype,T}(d, k,Θ, M, NN, C)
+        return PTU{nntype,T}(d, k,Θ, M, NN, C2)
     end
 end
 

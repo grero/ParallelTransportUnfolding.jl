@@ -12,6 +12,7 @@ using MultivariateStats: NonlinearDimensionalityReduction, KernelPCA,
 using Random: AbstractRNG, default_rng
 using StandardBasisVectors 
 using LinearAlgebra
+using ProgressMeter
 
 export PTU, fit, predict
 include("utils.jl")
