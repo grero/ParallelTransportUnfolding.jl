@@ -16,6 +16,7 @@ struct PTU{NN <: AbstractNearestNeighbors, T<:Real} <: NonlinearDimensionalityRe
     gauges::Array{T,3}
     model::MDS{T}
     nearestneighbors::NN
+    degree::Vector{Int64}
     component::AbstractVector{Int}
 end
 
@@ -229,7 +230,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     else
         DD = (DD+DD')/2
         M = fit(MDS, DD, distances=true, maxoutdim=maxoutdim)
-        return PTU{nntype,T}(d, k,B, M, NN, C2)
+        return PTU{nntype,T}(d, k,B, M, NN, degree(G), C2)
     end
 end
 
