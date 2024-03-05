@@ -93,11 +93,11 @@ R = transform(M)           # perform dimensionality reduction
 ```
 """
 function fit(::Type{PTU}, X::AbstractMatrix{T};
-             k::Real=12, K=k, maxoutdim::Int=2, nntype=BruteForce,debug=false) where {T<:Real}
+        k::Real=12, K=k, maxoutdim::Int=2, tangentdim=min(size(X,1)-1,k), nntype=BruteForce,debug=false) where {T<:Real}
     # Construct NN graph
     d, n = size(X)
     # construct orthognoal basis
-    B = zeros(T, d,maxoutdim,n)
+    B = zeros(T, d,tangentdim,n)
 
     NN = fit(nntype, X)
     E, _ = adjacency_list(NN, X, K)
@@ -131,14 +131,14 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     n = length(C2)
     # compute shortest path for every point
     DD = zeros(T,n,n)
-    R = diagm(ones(T, maxoutdim))
+    R = diagm(ones(T, tangentdim))
     R2 = similar(R)
     R3 = similar(R)
     #θ = zeros(T, d,maxoutdim)
     if debug
         V = zeros(T, d)
     else
-        V = zeros(T, maxoutdim)
+        V = zeros(T, tangentdim)
     end
     # debug timing info
     ΔTdj = 0.0
@@ -150,14 +150,14 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     nt = 0
 
     # temporary variables
-    Rq = fill(0.0, maxoutdim, maxoutdim, n,n)
+    Rq = fill(0.0, tangentdim, tangentdim, n,n)
     qq = fill(false, n,n)
-    θp = fill(0.0, maxoutdim, d)
+    θp = fill(0.0, tangentdim, d)
     ΔX = fill(0.0, d)
-    v = fill(0.0, maxoutdim)
+    v = fill(0.0, tangentdim)
 
-    prog2 = Progress(n, 1.0, "Computing geodesics...")
-    for i in 1:n 
+    prog2 = Progress(n; dt=1.0, desc="Computing geodesics...")
+    for i in 1:n
         t0 = time()
         dj = dijkstra_shortest_paths(G,i,Ac2;trackvertices=true)
         ΔTdj += time() - t0
@@ -167,7 +167,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
             # get the path from i to closest_vertices[k]
             kn = dj.closest_vertices[k]
             fill!(V,zero(T))
-            R .= I(maxoutdim)
+            R .= I(tangentdim)
             jp = i
             θ0 = view(B,:,:,C2[jp])
             t0 = time()
