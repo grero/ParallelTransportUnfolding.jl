@@ -255,3 +255,49 @@ Transforms the data fitted to the local tangent space alignment model `R` into a
 """
 predict(R::PTU) = predict(R.model)
 
+"""
+Parallel transport the vector `v` from the last point `p` to the first point `p` using the local tangent spaces `B`
+"""
+function parallel_transport_along_path(p::Vector{Int64}, v::Vector{T}, B::Array{T,3}) where T <: Real
+    d = length(v)
+    d,m,_ = size(B)
+    R = diagm(ones(T,m))
+    B0 = B[:,:,p[1]]
+    for i in 2:length(p)
+        B1 = B[:,:,p[i]]
+        ss = svd(B0'*B1)
+        R .= R*ss.U*ss.Vt
+        B0 .= B1
+    end
+    R*B[:,:,p[end]]'*v
+end
+
+"""
+Compute the geodesic distance along the path `p`.
+"""
+function get_path_length(p::Vector{Int64}, X::Matrix{T}, B::AbstractArray{T,3}) where T <: Real
+    d,n = size(X)
+    d,m,_ = size(B)
+    R = diagm(ones(T,m))
+    # temporary
+    Rq = fill!(similar(R), 0.0)
+    Rt = fill!(similar(R), 0.0)
+    B0 = view(B,:,:,p[1])
+    qq = fill(0.0,m,d)
+    V = fill(0.0, d)
+    v = fill(0.0, m)
+    vt = fill(0.0, m)
+    for i in 2:length(p)
+        B1 = view(B,:,:,p[i])
+        get_connection!(Rq, B0,B1)
+        mul!(Rt, R, Rq)
+        copy!(R, Rt)
+        copy!(V, view(X, :, p[i]))
+        V .-= view(X, :, p[i-1])
+        mul!(qq,R,B1')
+        mul!(vt, qq, V)
+        v .+= vt
+        B0 = B1
+    end
+    norm(v)
+end
