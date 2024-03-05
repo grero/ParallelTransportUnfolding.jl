@@ -61,6 +61,16 @@ function get_connection!(R::AbstractMatrix{T}, θi::AbstractMatrix{T}, θj::Abst
     mul!(R, ss.U, ss.Vt)
 end
 
+function get_basis!(B::AbstractMatrix{T}, X::AbstractMatrix{T}, i::T2, NI::Vector{T2}) where T <: Real where T2 <: Integer
+    d,p = size(B)
+    VX = view(X, :, NI)
+    δ_x = VX .- view(X, :, i:i)
+
+    ss = svd(δ_x;full=true)
+    Up = standardize_basis(ss.U)
+    B .= Up[:,1:p]
+end
+
 
 ## interface functions
 """
@@ -103,17 +113,19 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
 
         l = length(NI)
         l == 0 && continue # skip
-
+        t0 = time()
+        get_basis!(view(B, :,:,i), X, i, NI)
+        ΔTsb += time() - t0
         # re-center points in neighborhood
-        VX = view(X, :, NI)
-        δ_x = VX .- view(X, :, i:i) 
+        #VX = view(X, :, NI)
+        #δ_x = VX .- view(X, :, i:i)
 
         # Compute orthogonal basis H of θ'
-        ss = svd(δ_x;full=true)
-        t0 = time()
-        Up = standardize_basis(ss.U)
-        ΔTsb += time() - t0
-        B[:,:,i] = Up[:,1:maxoutdim]
+        #ss = svd(δ_x;full=true)
+        #t0 = time()
+        #Up = standardize_basis(ss.U)
+        #ΔTsb += time() - t0
+        #B[:,:,i] = Up[:,1:maxoutdim]
         next!(prog1)
     end
     n = length(C2)
