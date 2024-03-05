@@ -2,7 +2,7 @@ module ParallelTransportUnfolding
 import Base: size, show, summary
 import StatsAPI: fit, predict, pairwise, pairwise!
 import ManifoldLearning
-using ManifoldLearning: adjacency_list, adjacency_matrix, largest_component, AbstractNearestNeighbors, NonlinearDimensionalityReduction,BruteForce 
+using ManifoldLearning: adjacency_list, adjacency_matrix, largest_component, AbstractNearestNeighbors, NonlinearDimensionalityReduction,BruteForce, SparseMatrixCSC
 using Graphs: nv, add_edge!, connected_components, dijkstra_shortest_paths,
                   induced_subgraph, SimpleGraph, DijkstraState, degree
 using MultivariateStats: NonlinearDimensionalityReduction, KernelPCA,

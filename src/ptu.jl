@@ -14,6 +14,8 @@ struct PTU{NN <: AbstractNearestNeighbors, T<:Real} <: NonlinearDimensionalityRe
     d::Int
     k::Real
     gauges::Array{T,3}
+    adjacency_matrix::SparseMatrixCSC{T,Int64}
+    proximity_graph::SimpleGraph{Int64}
     model::MDS{T}
     nearestneighbors::NN
     degree::Vector{Int64}
@@ -242,7 +244,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     else
         DD = (DD+DD')/2
         M = fit(MDS, DD, distances=true, maxoutdim=maxoutdim)
-        return PTU{nntype,T}(d, k,B, M, NN, degree(G), C2)
+        return PTU{nntype,T}(d, k,B, A,G,M, NN, degree(G), C2)
     end
 end
 
