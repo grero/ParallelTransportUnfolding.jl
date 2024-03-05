@@ -109,7 +109,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     Ac2 = A[C2,C2]
 
     ΔTsb = 0.0
-    prog1 = Progress(n, 1.0, "Constructiong bases...") 
+    prog1 = Progress(n; dt=1.0, desc="Constructiong bases...")
     for i in 1:n
         NI = E[i] # neighbor's indexes
 
