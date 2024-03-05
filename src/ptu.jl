@@ -1,6 +1,6 @@
 # Parallel Transport Unfolding (PTU)
 # ---------------------------
-# Budninskiy, Max, Glorian Yin, Leman Feng, Yiying Tong, and Mathieu Desbrun. 
+# Budninskiy, Max, Glorian Yin, Leman Feng, Yiying Tong, and Mathieu Desbrun.
 # “Parallel Transport Unfolding: A Connection-Based Manifold Learning Approach.” arXiv, November 2, 2018.
 # http://arxiv.org/abs/1806.09039.
 
@@ -14,6 +14,8 @@ struct PTU{NN <: AbstractNearestNeighbors, T<:Real} <: NonlinearDimensionalityRe
     d::Int
     k::Real
     gauges::Array{T,3}
+    adjacency_matrix::SparseMatrixCSC{T,Int64}
+    proximity_graph::SimpleGraph{Int64}
     model::MDS{T}
     nearestneighbors::NN
     degree::Vector{Int64}
@@ -52,13 +54,23 @@ function get_connection!(R::AbstractMatrix{T}, i::Int, j::Int, Θ::AbstractArray
         return I(p)
     end
     θ0 = view(Θ,:,:,i)
-    Θ1 = view(Θ,:,:,j) 
-    get_connection!(R, θ0, θ1)
+    θ1 = view(Θ,:,:,j)
+    get_connection!(R, θ0,θ1)
 end
 
 function get_connection!(R::AbstractMatrix{T}, θi::AbstractMatrix{T}, θj::AbstractMatrix{T}) where T <: Real
     ss = svd(θi'*θj)
     mul!(R, ss.U, ss.Vt)
+end
+
+function get_basis!(B::AbstractMatrix{T}, X::AbstractMatrix{T}, i::T2, NI::Vector{T2}) where T <: Real where T2 <: Integer
+    d,p = size(B)
+    VX = view(X, :, NI)
+    δ_x = VX .- view(X, :, i:i)
+
+    ss = svd(δ_x;full=true)
+    Up = standardize_basis(ss.U)
+    B .= Up[:,1:p]
 end
 
 
@@ -83,50 +95,52 @@ R = transform(M)           # perform dimensionality reduction
 ```
 """
 function fit(::Type{PTU}, X::AbstractMatrix{T};
-             k::Real=12, K=k, maxoutdim::Int=2, nntype=BruteForce,debug=false) where {T<:Real}
+        k::Real=12, K=k, maxoutdim::Int=2, tangentdim=min(size(X,1)-1,k), nntype=BruteForce,debug=false) where {T<:Real}
     # Construct NN graph
     d, n = size(X)
     # construct orthognoal basis
-    B = zeros(T, d,maxoutdim,n)
+    B = zeros(T, d,tangentdim,n)
 
     NN = fit(nntype, X)
     E, _ = adjacency_list(NN, X, K)
 
     A = adjacency_matrix(NN, X, k)
     G, C2 = largest_component(SimpleGraph(A))
-    Ac2 = A[C2,C2] 
+    Ac2 = A[C2,C2]
 
     ΔTsb = 0.0
-    prog1 = Progress(n, 1.0, "Constructiong bases...") 
+    prog1 = Progress(n; dt=1.0, desc="Constructiong bases...")
     for i in 1:n
         NI = E[i] # neighbor's indexes
 
         l = length(NI)
         l == 0 && continue # skip
-
+        t0 = time()
+        get_basis!(view(B, :,:,i), X, i, NI)
+        ΔTsb += time() - t0
         # re-center points in neighborhood
-        VX = view(X, :, NI)
-        δ_x = VX .- view(X, :, i:i) 
+        #VX = view(X, :, NI)
+        #δ_x = VX .- view(X, :, i:i)
 
         # Compute orthogonal basis H of θ'
-        ss = svd(δ_x;full=true)
-        t0 = time()
-        Up = standardize_basis(ss.U)
-        ΔTsb += time() - t0
-        B[:,:,i] = Up[:,1:maxoutdim]
+        #ss = svd(δ_x;full=true)
+        #t0 = time()
+        #Up = standardize_basis(ss.U)
+        #ΔTsb += time() - t0
+        #B[:,:,i] = Up[:,1:maxoutdim]
         next!(prog1)
     end
     n = length(C2)
     # compute shortest path for every point
     DD = zeros(T,n,n)
-    R = diagm(ones(T, maxoutdim))
+    R = diagm(ones(T, tangentdim))
     R2 = similar(R)
     R3 = similar(R)
     #θ = zeros(T, d,maxoutdim)
     if debug
         V = zeros(T, d)
     else
-        V = zeros(T, maxoutdim)
+        V = zeros(T, tangentdim)
     end
     # debug timing info
     ΔTdj = 0.0
@@ -138,14 +152,14 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     nt = 0
 
     # temporary variables
-    Rq = fill(0.0, maxoutdim, maxoutdim, n,n)
+    Rq = fill(0.0, tangentdim, tangentdim, n,n)
     qq = fill(false, n,n)
-    θp = fill(0.0, maxoutdim, d)
+    θp = fill(0.0, tangentdim, d)
     ΔX = fill(0.0, d)
-    v = fill(0.0, maxoutdim)
+    v = fill(0.0, tangentdim)
 
-    prog2 = Progress(n, 1.0, "Computing geodesics...")
-    for i in 1:n 
+    prog2 = Progress(n; dt=1.0, desc="Computing geodesics...")
+    for i in 1:n
         t0 = time()
         dj = dijkstra_shortest_paths(G,i,Ac2;trackvertices=true)
         ΔTdj += time() - t0
@@ -155,7 +169,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
             # get the path from i to closest_vertices[k]
             kn = dj.closest_vertices[k]
             fill!(V,zero(T))
-            R .= I(maxoutdim)
+            R .= I(tangentdim)
             jp = i
             θ0 = view(B,:,:,C2[jp])
             t0 = time()
@@ -210,7 +224,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
                     jp = j1
                 end
             end
-            #DD[i,kn] = sum(abs2, V) 
+            #DD[i,kn] = sum(abs2, V)
             if debug == false
                 DD[i,kn] = norm(V)
             else
@@ -230,7 +244,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     else
         DD = (DD+DD')/2
         M = fit(MDS, DD, distances=true, maxoutdim=maxoutdim)
-        return PTU{nntype,T}(d, k,B, M, NN, degree(G), C2)
+        return PTU{nntype,T}(d, k,B, A,G,M, NN, degree(G), C2)
     end
 end
 
@@ -241,3 +255,49 @@ Transforms the data fitted to the local tangent space alignment model `R` into a
 """
 predict(R::PTU) = predict(R.model)
 
+"""
+Parallel transport the vector `v` from the last point `p` to the first point `p` using the local tangent spaces `B`
+"""
+function parallel_transport_along_path(p::Vector{Int64}, v::Vector{T}, B::Array{T,3}) where T <: Real
+    d = length(v)
+    d,m,_ = size(B)
+    R = diagm(ones(T,m))
+    B0 = B[:,:,p[1]]
+    for i in 2:length(p)
+        B1 = B[:,:,p[i]]
+        ss = svd(B0'*B1)
+        R .= R*ss.U*ss.Vt
+        B0 .= B1
+    end
+    R*B[:,:,p[end]]'*v
+end
+
+"""
+Compute the geodesic distance along the path `p`.
+"""
+function get_path_length(p::Vector{Int64}, X::Matrix{T}, B::AbstractArray{T,3}) where T <: Real
+    d,n = size(X)
+    d,m,_ = size(B)
+    R = diagm(ones(T,m))
+    # temporary
+    Rq = fill!(similar(R), 0.0)
+    Rt = fill!(similar(R), 0.0)
+    B0 = view(B,:,:,p[1])
+    qq = fill(0.0,m,d)
+    V = fill(0.0, d)
+    v = fill(0.0, m)
+    vt = fill(0.0, m)
+    for i in 2:length(p)
+        B1 = view(B,:,:,p[i])
+        get_connection!(Rq, B0,B1)
+        mul!(Rt, R, Rq)
+        copy!(R, Rt)
+        copy!(V, view(X, :, p[i]))
+        V .-= view(X, :, p[i-1])
+        mul!(qq,R,B1')
+        mul!(vt, qq, V)
+        v .+= vt
+        B0 = B1
+    end
+    norm(v)
+end
