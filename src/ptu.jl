@@ -1,6 +1,6 @@
 # Parallel Transport Unfolding (PTU)
 # ---------------------------
-# Budninskiy, Max, Glorian Yin, Leman Feng, Yiying Tong, and Mathieu Desbrun. 
+# Budninskiy, Max, Glorian Yin, Leman Feng, Yiying Tong, and Mathieu Desbrun.
 # “Parallel Transport Unfolding: A Connection-Based Manifold Learning Approach.” arXiv, November 2, 2018.
 # http://arxiv.org/abs/1806.09039.
 
@@ -54,8 +54,8 @@ function get_connection!(R::AbstractMatrix{T}, i::Int, j::Int, Θ::AbstractArray
         return I(p)
     end
     θ0 = view(Θ,:,:,i)
-    Θ1 = view(Θ,:,:,j) 
-    get_connection!(R, θ0, θ1)
+    θ1 = view(Θ,:,:,j)
+    get_connection!(R, θ0,θ1)
 end
 
 function get_connection!(R::AbstractMatrix{T}, θi::AbstractMatrix{T}, θj::AbstractMatrix{T}) where T <: Real
@@ -106,7 +106,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
 
     A = adjacency_matrix(NN, X, k)
     G, C2 = largest_component(SimpleGraph(A))
-    Ac2 = A[C2,C2] 
+    Ac2 = A[C2,C2]
 
     ΔTsb = 0.0
     prog1 = Progress(n, 1.0, "Constructiong bases...") 
@@ -224,7 +224,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
                     jp = j1
                 end
             end
-            #DD[i,kn] = sum(abs2, V) 
+            #DD[i,kn] = sum(abs2, V)
             if debug == false
                 DD[i,kn] = norm(V)
             else
