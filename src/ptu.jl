@@ -14,6 +14,7 @@ struct PTU{NN <: AbstractNearestNeighbors, T<:Real} <: NonlinearDimensionalityRe
     d::Int
     k::Real
     gauges::Array{T,3}
+    sv::Matrix{T} # singular values associated with the gauges
     adjacency_matrix::SparseMatrixCSC{T,Int64}
     proximity_graph::SimpleGraph{Int64}
     model::MDS{T}
@@ -63,12 +64,14 @@ function get_connection!(R::AbstractMatrix{T}, θi::AbstractMatrix{T}, θj::Abst
     mul!(R, ss.U, ss.Vt)
 end
 
-function get_basis!(B::AbstractMatrix{T}, X::AbstractMatrix{T}, i::T2, NI::Vector{T2}) where T <: Real where T2 <: Integer
+function get_basis!(B::AbstractMatrix{T}, sv::AbstractVector{T}, X::AbstractMatrix{T}, i::T2, NI::Vector{T2}) where T <: Real where T2 <: Integer
     d,p = size(B)
     VX = view(X, :, NI)
     δ_x = VX .- view(X, :, i:i)
-
+    # TODO: We should be able to use thin svd here, but for some reason that doesn't currrently work
+    # with StandardBasisVectors, which requires a square matrix.
     ss = svd(δ_x;full=true)
+    copy!(sv, ss.S)
     Up = standardize_basis(ss.U)
     B .= Up[:,1:p]
 end
@@ -100,6 +103,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     d, n = size(X)
     # construct orthognoal basis
     B = zeros(T, d,tangentdim,n)
+    sv = zeros(T, d, n)
 
     NN = fit(nntype, X)
     E, _ = adjacency_list(NN, X, K)
@@ -116,7 +120,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
         l = length(NI)
         l == 0 && continue # skip
         t0 = time()
-        get_basis!(view(B, :,:,i), X, i, NI)
+        get_basis!(view(B, :,:,i), view(sv, :, i), X, i, NI)
         ΔTsb += time() - t0
         # re-center points in neighborhood
         #VX = view(X, :, NI)
@@ -244,7 +248,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     else
         DD = (DD+DD')/2
         M = fit(MDS, DD, distances=true, maxoutdim=maxoutdim)
-        return PTU{nntype,T}(d, k,B, A,G,M, NN, degree(G), C2)
+        return PTU{nntype,T}(d, k,B, sv, A,G,M, NN, degree(G), C2)
     end
 end
 
