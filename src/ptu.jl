@@ -71,7 +71,7 @@ function get_basis!(B::AbstractMatrix{T}, sv::AbstractVector{T}, X::AbstractMatr
     # TODO: We should be able to use thin svd here, but for some reason that doesn't currrently work
     # with StandardBasisVectors, which requires a square matrix.
     ss = svd(δ_x;full=true)
-    copy!(sv, ss.S)
+    sv .= ss.S
     Up = standardize_basis(ss.U)
     B .= Up[:,1:p]
 end
@@ -103,7 +103,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     d, n = size(X)
     # construct orthognoal basis
     B = zeros(T, d,tangentdim,n)
-    sv = zeros(T, d, n)
+    sv = zeros(T, K, n)
 
     NN = fit(nntype, X)
     E, _ = adjacency_list(NN, X, K)
