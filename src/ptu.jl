@@ -70,10 +70,16 @@ function get_basis!(B::AbstractMatrix{T}, sv::AbstractVector{T}, X::AbstractMatr
     δ_x = VX .- view(X, :, i:i)
     # TODO: We should be able to use thin svd here, but for some reason that doesn't currrently work
     # with StandardBasisVectors, which requires a square matrix.
+    # debug
+    t0 = time()
     ss = svd(δ_x;full=true)
+    t1 = time() - t0
     sv .= ss.S
+    t0 = time()
     Up = standardize_basis(ss.U)
+    t2 = time()-t0
     B .= Up[:,1:p]
+    t1,t2
 end
 
 
@@ -112,6 +118,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     G, C2 = largest_component(SimpleGraph(A))
     Ac2 = A[C2,C2]
 
+    ΔTsvd = 0.0
     ΔTsb = 0.0
     prog1 = Progress(n; dt=1.0, desc="Constructiong bases...")
     for i in 1:n
@@ -119,9 +126,9 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
 
         l = length(NI)
         l == 0 && continue # skip
-        t0 = time()
-        get_basis!(view(B, :,:,i), view(sv, :, i), X, i, NI)
-        ΔTsb += time() - t0
+        _t1,_t2 = get_basis!(view(B, :,:,i), view(sv, :, i), X, i, NI)
+        ΔTsvd += _t1
+        ΔTsb += _t2
         # re-center points in neighborhood
         #VX = view(X, :, NI)
         #δ_x = VX .- view(X, :, i:i)
@@ -239,7 +246,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     end
     # broadcast!(x->-x*x/2, DD, DD)
     #symmetrize!(DD) # error in MvStats
-    @show ΔT0, ΔT1, ΔT2, ΔT3, ΔTdj, ΔTp, ΔTsb, nt
+    @show ΔT0, ΔT1, ΔT2, ΔT3, ΔTdj, ΔTp, ΔTsb, ΔTsvd, nt
     if debug
         broadcast!(x->-x*x/2, DD, DD)
         DD = (DD+DD')/2
