@@ -103,7 +103,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     d, n = size(X)
     # construct orthognoal basis
     B = zeros(T, d,tangentdim,n)
-    sv = zeros(T, K, n)
+    sv = zeros(T, d, n)
 
     NN = fit(nntype, X)
     E, _ = adjacency_list(NN, X, K)
