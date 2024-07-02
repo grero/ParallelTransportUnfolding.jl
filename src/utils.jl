@@ -1,3 +1,31 @@
+function cknn(NN::BruteForce{T}, X::AbstractVecOrMat{T}, k::Integer,
+             δ::T; weights=false, kwargs...) where T<:Real
+
+    n = size(X,2)
+    D = pairwise((x,y)->norm(x-y), eachcol(NN.fitted), eachcol(X))
+    Q = fill(0.0, n)
+    QI = fill(0, n)
+    #get the k-th nearest neighbour distance for each point
+    @inbounds for (j, ds) in enumerate(eachcol(D))
+        ii = sortperm(ds)[k]
+        Q[j] = ds[ii]
+        QI[j] = ii
+    end
+    A = Vector{Vector{Int}}(undef, n)
+    W = Vector{Vector{T}}(undef, (weights ? n : 0))
+    @inbounds for (j, ds) in enumerate(eachcol(D))
+        A[j] = findall(ds .< δ*sqrt.(Q[j].*Q))
+        if weights
+            W[j] = D[A[j], j]
+        end
+    end
+    A,W
+end
+
+function ManifoldLearning.adjacency_list(NN::AbstractNearestNeighbors, X::AbstractVecOrMat{T}, k::Integer, δ::Real;weights::Bool=false, kwargs...) where T <: Real
+    A,W = cknn(NN, X, k, δ;weights=weights, kwargs...)
+end
+
 function get_path(dj::DijkstraState, v::Integer)
     u = v
     path = [u]

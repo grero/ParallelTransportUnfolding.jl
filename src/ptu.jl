@@ -97,8 +97,8 @@ M = fit(PTU, rand(3,100)) # construct PTU model
 R = transform(M)           # perform dimensionality reduction
 ```
 """
-function fit(::Type{PTU}, X::AbstractMatrix{T};
-        k::Real=12, K=k, maxoutdim::Int=2, tangentdim=min(size(X,1)-1,k), nntype=BruteForce,debug=false) where {T<:Real}
+function fit(::Type{PTU}, X::AbstractMatrix{T},
+        k::Real, args...;K=k, maxoutdim::Int=2, tangentdim=min(size(X,1)-1,k), nntype=BruteForce,debug=false) where {T<:Real}
     # Construct NN graph
     d, n = size(X)
     # construct orthognoal basis
@@ -106,7 +106,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T};
     sv = zeros(T, d, n)
 
     NN = fit(nntype, X)
-    E, _ = adjacency_list(NN, X, K)
+    E, _ = adjacency_list(NN, X, K, args...)
 
     A = adjacency_matrix(NN, X, k)
     G, C2 = largest_component(SimpleGraph(A))
