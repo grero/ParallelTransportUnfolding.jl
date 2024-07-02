@@ -216,3 +216,20 @@ Transforms the data fitted to the local tangent space alignment model `R` into a
 """
 predict(R::PTU) = predict(R.model)
 
+"""
+Parallel transport the vector `v` from the last point `p` to the first point `p` using the local tangent spaces `B`
+"""
+function parallel_transport_along_path(p::Vector{Int64}, v::Vector{T}, B::Array{T,3}) where T <: Real
+    d = length(v)
+    d,m,_ = size(B)
+    R = diagm(ones(T,m))
+    B0 = B[:,:,p[1]]
+    for i in 2:length(p)
+        B1 = B[:,:,p[i]]
+        ss = svd(B0'*B1)
+        R .= R*ss.U*ss.Vt
+        B0 .= B1
+    end
+    R*B[:,:,p[end]]'*c
+end
+
