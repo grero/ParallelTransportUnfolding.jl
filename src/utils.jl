@@ -26,6 +26,15 @@ function ManifoldLearning.adjacency_list(NN::AbstractNearestNeighbors, X::Abstra
     A,W = cknn(NN, X, k, δ;weights=weights, kwargs...)
 end
 
+function ManifoldLearning.adjacency_matrix(NN::AbstractNearestNeighbors, X::AbstractVecOrMat{T},
+                           k::Integer, δ::Real; symmetric::Bool=true, kwargs...) where T<:Real
+    n = size(NN)[2]
+    m = length(eachcol(X))
+    @assert n >=m "Cannot construc matrix for more then $n fitted points"
+    E, W = cknn(NN, X, k,δ; weights=true, kwargs...)
+    return ManifoldLearning.sparse(E, W, n, symmetric=symmetric)
+end
+
 function get_path(dj::DijkstraState, v::Integer)
     u = v
     path = [u]
