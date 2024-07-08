@@ -108,7 +108,7 @@ function fit(::Type{PTU}, X::AbstractMatrix{T},
     NN = fit(nntype, X)
     E, _ = adjacency_list(NN, X, K, args...)
 
-    A = adjacency_matrix(NN, X, k)
+    A = adjacency_matrix(NN, X, k, args...)
     G, C2 = largest_component(SimpleGraph(A))
     Ac2 = A[C2,C2]
 
