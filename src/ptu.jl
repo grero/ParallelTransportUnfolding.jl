@@ -98,7 +98,7 @@ R = transform(M)           # perform dimensionality reduction
 ```
 """
 function fit(::Type{PTU}, X::AbstractMatrix{T},
-        k::Real, args...;K=k, maxoutdim::Int=2, tangentdim=min(size(X,1)-1,k), nntype=BruteForce,debug=false) where {T<:Real}
+        k::Real, args...;K=k, maxoutdim::Int=2, tangentdim=min(size(X,1)-1,K), nntype=BruteForce,debug=false) where {T<:Real}
     # Construct NN graph
     d, n = size(X)
     # construct orthognoal basis
