@@ -71,7 +71,7 @@ function get_basis!(B::AbstractMatrix{T}, sv::AbstractVector{T}, X::AbstractMatr
     # TODO: We should be able to use thin svd here, but for some reason that doesn't currrently work
     # with StandardBasisVectors, which requires a square matrix.
     ss = svd(δ_x;full=true)
-    sv .= ss.S
+    sv[1:length(ss.S)] .= ss.S
     Up = standardize_basis(ss.U)
     B .= Up[:,1:p]
 end
